@@ -1,0 +1,25 @@
+[general] 
+creator=R package 'raster' 
+created= 2015-01-13 16:20:46 
+[georeference] 
+nrows= 1177 
+ncols= 1548 
+xmin= 808755 
+ymin= 817635 
+xmax= 855195 
+ymax= 852945 
+projection= +proj=utm +zone=36 +ellps=WGS84 +units=m +no_defs 
+[data] 
+datatype= FLT8S 
+byteorder= little 
+nbands= 7 
+bandorder= BIL 
+minvalue= 0.0127:0.0195:0.01:0.0639:0.0136:0.0058:0 
+maxvalue= 0.1545:0.2199:0.2774:0.4903:0.4677:0.4525:100 
+nodatavalue= -1.7e+308 
+[legend] 
+legendtype=  
+values=  
+color=  
+[description] 
+layername= band1:band2:band3:band4:band5:band7:VCF 
