@@ -8,14 +8,14 @@ library(rgeos)
 library(rgdal)
 library(maptools)
 library(randomForest)
-
+library(Metrics)
 
 load("data/GewataB1.rda")
-load("data/GewataB5.rda")
-load("data/GewataB7.rda")
 load("data/GewataB2.rda")
 load("data/GewataB3.rda")
 load("data/GewataB4.rda")
+load("data/GewataB5.rda")
+load("data/GewataB7.rda")
 load("data/vcfGewata.rda")
 load("data/trainingPoly.rda")
 load("data/lulcGewata.rda")
@@ -25,7 +25,7 @@ load("data/LUTGewata.rda")
 ########################################################################################
 ########################################################################################
 
-#Part 1
+# Part 1
 # Produce one or more plots that demonstrate the relationship between the Landsat 
 # bands and the VCF tree cover. What can you conclude from this/these plot(s)?
 
@@ -33,39 +33,39 @@ load("data/LUTGewata.rda")
 # Create the basic gewata raster and adjust it also produce the first required pairsplot:
 gewata <- brick(GewataB1,GewataB2, GewataB3, GewataB4, GewataB5, GewataB7)
 names(gewata) <- c("band1", "band2", "band3", "band4",  "band5", "band7")
-gewata <- calc(gewata, fun=function(x) x / 10000)
+gewata <- calc(gewata, fun = function(x) x / 10000)
 
+# Change VCF values larger than 100 into NA and plot the result:
 vcfGewata[vcfGewata > 100] <- NA
 plot(vcfGewata)
 
 names(vcfGewata) <- c("VCF")
 summary(vcfGewata)
 
-gewatavcf <-  addLayer(gewata,vcfGewata)
+gewatavcf <- addLayer(gewata, vcfGewata)
 
 hist(gewatavcf)
 pairs(gewatavcf)
+
+# Conclusion: Bands 3 and 7 are best corelated. Correlation coefficient for this pair is 0.96.
 
 ######################################################################################
 ######################################################################################
 
 # optional data sources
 
-# create NDVI raster as option:
-
-ndvi <- overlay(GewataB4, GewataB3, fun=function(x,y){(x-y)/(x+y)})
-
+# create NDVI raster:
+ndvi <- overlay(GewataB4, GewataB3, fun = function(x,y){(x-y)/(x+y)})
 
 # create basic mask versions (forest) of basic gewata raster as option:
-
 lulc <- as.factor(lulcGewata)
 levels(lulc) <- LUTGewata
 classes <- layerize(lulc)
 names(classes) <- LUTGewata$Class
-plot(classes, legend=FALSE)
+plot(classes, legend = FALSE)
 forest <- classes$forest
-forest[forest==0] <- NA
-plot(forest, col="dark green", legend = FALSE)
+forest[forest == 0] <- NA
+plot(forest, col = "dark green", legend = FALSE)
 gewataforest <- mask(gewatavcf, forest, filename = "output/LandSatBandsVCFForestRelationship", overwrite = T)
 plot(gewataforest)
 
@@ -122,7 +122,7 @@ model.rf <- randomForest(x = gewatatrainingDF[ ,c(3,6)], y = gewatatrainingDF$cl
 predLC <- predict(gewatatraining, model=lm.a1, na.rm=TRUE)
 
 cols <- c("orange", "dark green", "light blue")
-plot(predLC, col=cols, legend=FALSE)
+plot(predLC, col=cols, legend = FALSE)
 
 
 par(mfrow=c(1, 1))
@@ -138,8 +138,8 @@ plot(gewatalmforest)
 # Part 4
 # compute the RMSE between your predicted and the actual tree cover values
 
-
-
+predLCandVCFrmse <- rmse(vcfGewata, predLC, na.rm=TRUE)
+plot(predLCandVCFrmse)
 
 
 
@@ -148,6 +148,10 @@ plot(gewatalmforest)
 ###########################################################################################
 
 # Part 5
-# Are the differences between the predicted and actual tree cover the same for all of the 3 classes we 
-# used for the random forest classfication? Using the training polygons from the random forest classification, 
+# Are the differences between the predicted and actual tree cover the same for all of the 3 classes we used 
+# for the random forest classfication? Using the training polygons from the random forest classification, 
 # calculate the RMSE separately for each of the classes and compare. Hint - see ?zonal().
+
+zonal(())
+
+zonal(vcfGewata, predLC, fun ='rmse', digits = 0, na.rm = TRUE)
