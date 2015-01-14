@@ -7,8 +7,8 @@ library(raster)
 library(rgeos)
 library(rgdal)
 library(maptools)
-library(randomForest)
-library(Metrics)
+
+
 
 load("data/GewataB1.rda")
 load("data/GewataB2.rda")
@@ -37,14 +37,12 @@ gewata <- calc(gewata, fun = function(x) x / 10000)
 
 # Change VCF values larger than 100 into NA and plot the result:
 vcfGewata[vcfGewata > 100] <- NA
-plot(vcfGewata)
+
 
 names(vcfGewata) <- c("VCF")
-summary(vcfGewata)
 
 gewatavcf <- addLayer(gewata, vcfGewata)
 
-hist(gewatavcf)
 pairs(gewatavcf)
 
 # Conclusion: Bands 3 and 7 are best corelated. Correlation coefficient for this pair is 0.96.
@@ -55,7 +53,6 @@ pairs(gewatavcf)
 # optional data sources
 
 # create NDVI raster:
-ndvi <- overlay(GewataB4, GewataB3, fun = function(x,y){(x-y)/(x+y)})
 
 # create basic mask versions (forest) of basic gewata raster as option:
 lulc <- as.factor(lulcGewata)
@@ -65,7 +62,6 @@ names(classes) <- LUTGewata$Class
 plot(classes, legend = FALSE)
 forest <- classes$forest
 forest[forest == 0] <- NA
-plot(forest, col = "dark green", legend = FALSE)
 gewataforest <- mask(gewatavcf, forest, filename = "output/LandSatBandsVCFForestRelationship", overwrite = T)
 plot(gewataforest)
 
@@ -79,37 +75,27 @@ plot(gewataforest)
 
 # Create the polygon training classification sytem, data for the lm:
 trainingPoly@data$Code <- as.numeric(trainingPoly@data$Class)
-classes <- rasterize(trainingPoly, ndvi, field='Code')
+classes <- rasterize(trainingPoly, gewatavcf , field='Code')
 names(classes) <- c("class")
 cols <- c("orange", "dark green", "light blue")
-plot(classes, col=cols, legend=FALSE)
-legend("topright", legend=c("cropland", "forest", "wetland"), fill=cols, bg="white")
 
 # create a masked version of the training model:
 gewatatraining <- mask(gewatavcf, classes)
 gewatatraining <- addLayer(gewatatraining,classes)
-plot(gewatatraining)
+gewatatraining[gewatatraining < 0] <- NA
+gewatatraining[gewatatraining > 100] <- NA
 
-# Create the gewataavf and gewatatraining data frame:
-gewatavcftable <- getValues(gewatavcf)
-gewatavcftable2 <- na.omit(gewatavcftable)
-gewatavcfDF <- as.data.frame(gewatavcftable2)
-
-#OKAY IM DONE NA OMIT DOES NOT SEEM TO BE WORKING NEED TO USE THE DATAFRAME IN THE MODELRF TO PREDICT THE FOREST
-#ANYWAY DOESNT WORK FOR NOW GOOD LUCK ILL TRY IT TOO
+# Create gewatatraining data frame:
 
 gewatatrainingtable <- getValues(gewatatraining)
 gewatatrainingtable2 <- na.omit(gewatatrainingtable)
 gewatatrainingDF <- as.data.frame(gewatatrainingtable2)
 
-head(gewatavcfDF, n = 10)
 head(gewatatrainingDF, n = 10)
 
 # run the linear model on the gewatavcfDF data frame use most predicitve bands (3 and 7)
-lm.a1 <- lm(band3 ~ band7, data = gewatavcfDF)
+lm.a1 <- lm(formula = VCF ~ band2 + band3 + band7, data = gewatatrainingDF)
 summary(lm.a1)
-
-
 
 ############################################################################################
 ###########################################################################################
@@ -117,19 +103,22 @@ summary(lm.a1)
 # Part 3
 # Plot the predicted tree cover raster and compare with the original VCF raster.
 
-model.rf <- randomForest(x = gewatatrainingDF[ ,c(3,6)], y = gewatatrainingDF$class, importance = TRUE)
+lmgewatapredict <- predict(gewatavcf, model=lm.a1, filename = 'output/lmgewatapredict', progress = 'text', overwrite = T, na.omit = T)
 
-predLC <- predict(gewatatraining, model=lm.a1, na.rm=TRUE)
+lmgewatapredict[lmgewatapredict < 0] <- NA
+lmgewatapredict[lmgewatapredict > 100] <- NA
 
 cols <- c("orange", "dark green", "light blue")
-plot(predLC, col=cols, legend = FALSE)
 
+difference <- vcfGewata - lmgewatapredict
 
-par(mfrow=c(1, 1))
-gewatalm <-  addLayer(predLC,vcfGewata)
-plot(gewatalm)
-gewatalmforest <- mask(gewatalm,forest)
-plot(gewatalmforest)
+par(mfrow=c(1, 3))
+
+plot(lmgewatapredict, col=cols, main = "Predicted")
+
+plot(vcfGewata, col=cols, main = "Actual")
+
+plot(difference, col=cols, main = "Difference")
 
 
 ############################################################################################
@@ -138,11 +127,11 @@ plot(gewatalmforest)
 # Part 4
 # compute the RMSE between your predicted and the actual tree cover values
 
-predLCandVCFrmse <- rmse(vcfGewata, predLC, na.rm=TRUE)
-plot(predLCandVCFrmse)
+source("R/RMSE.R")
 
+gewatarmse <- RMSE(vcfGewata, lmgewatapredict)
 
-
+gewatarmse
 
 ############################################################################################
 ###########################################################################################
@@ -152,6 +141,29 @@ plot(predLCandVCFrmse)
 # for the random forest classfication? Using the training polygons from the random forest classification, 
 # calculate the RMSE separately for each of the classes and compare. Hint - see ?zonal().
 
-zonal(())
+gewatatrainingDF$class <- factor(gewatatrainingDF$class, levels = c(1:3))
 
-zonal(vcfGewata, predLC, fun ='rmse', digits = 0, na.rm = TRUE)
+gewata_crop <- subset(gewatatrainingDF, class == 1)
+gewata_forest <- subset(gewatatrainingDF, class == 2)
+gewata_wetland <- subset(gewatatrainingDF, class == 3)
+
+lm.c <- lm(formula = VCF ~ band2 + band3 + band7, data = gewata_crop)
+summary(lm.c)
+lm.f <- lm(formula = VCF ~ band2 + band3 + band7, data = gewata_forest)
+summary(lm.f)
+lm.w <- lm(formula = VCF ~ band2 + band3 + band7, data = gewata_wetland)
+summary(lm.w)
+
+gewata_croppred <- predict(gewatavcf, model=lm.c, filename = 'output/gewata_croppred', progress = 'text', overwrite = T, na.omit = T)
+gewata_forestpred <- predict(gewatavcf, model=lm.f, filename = 'output/gewata_forestpred', progress = 'text', overwrite = T, na.omit = T)
+gewata_wetlandpred <- predict(gewatavcf, model=lm.w, filename = 'output/gewata_wetlandpred', progress = 'text', overwrite = T, na.omit = T)
+
+croprmse <- RMSE(vcfGewata, gewata_croppred)
+forestrmse <- RMSE(vcfGewata, gewata_forestpred)
+wetlandrmse <- RMSE(vcfGewata, gewata_wetlandpred)
+
+croprmse
+forestrmse
+wetlandrmse
+
+
