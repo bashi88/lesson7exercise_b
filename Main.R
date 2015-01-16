@@ -13,7 +13,6 @@ load("data/GewataB5.rda")
 load("data/GewataB7.rda")
 load("data/vcfGewata.rda")
 load("data/trainingPoly.rda")
-load("data/LUTGewata.rda")
 
 ########################################################################################
 ########################################################################################
@@ -58,8 +57,8 @@ summary(lm.trees)
 # Plot the predicted tree cover raster and compare with the original VCF raster.
 
 predfullVCF <- predict(covs, model=lm.trees, filename = 'output/predfullVCF', progress = 'text', overwrite = T, na.omit = T)
-predfullVCF[lmtreepredict < 0] <- NA
-predfullVCF[lmtreepredict > 100] <- NA
+predfullVCF[predfullVCF < 0] <- NA
+predfullVCF[predfullVCF > 100] <- NA
 difference <- overlay(vcfGewata, predfullVCF, fun = function(x, y){(x-y)}, overwrite = T,
                       filename = "output/VCFGewataDiff")
 par(mfrow=c(1, 3))
