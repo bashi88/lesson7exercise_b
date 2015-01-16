@@ -3,7 +3,7 @@
 # Date: 12/01/2015
 # Exercise 7
 library(raster)
-
+library(knitr)
 
 load("data/GewataB1.rda")
 load("data/GewataB2.rda")
@@ -60,12 +60,13 @@ summary(lm.trees)
 predfullVCF <- predict(covs, model=lm.trees, filename = 'output/predfullVCF', progress = 'text', overwrite = T, na.omit = T)
 predfullVCF[lmtreepredict < 0] <- NA
 predfullVCF[lmtreepredict > 100] <- NA
-difference <- vcfGewata - predfullVCF
+difference <- overlay(vcfGewata, predfullVCF, fun = function(x, y){(x-y)}, overwrite = T,
+                      filename = "output/VCFGewataDiff")
 par(mfrow=c(1, 3))
 cols <- c("orange", "dark green", "light blue")
 plot(predfullVCF, col=cols, zlim=c(0,100), main = "Predicted Gewata VCF")
 plot(vcfGewata, col=cols, main = "Actual Gewata VCF")
-plot(difference, col=cols, main = "Difference in VCF")
+plot(difference, main = "Difference in VCF", zlim=c(-30,30), col = colorRampPalette(c("yellow", "white", "black"))(30))
 par(mfrow = c(1,1))
 
 ############################################################################################
@@ -78,6 +79,9 @@ source("R/RMSE.R")
 
 fullVCFrmse <- RMSE(vcfGewata, predfullVCF)
 fullVCFrmse
+
+# Full RMSE
+# 9.412138
 
 ############################################################################################
 ###########################################################################################
@@ -108,4 +112,9 @@ diff.cov.mean <- zonal(diff.cov.squared, covs.classes.masked$class, fun = 'mean'
 RMSE.cov <- sqrt(diff.cov.mean[, 2])
 RMSE.cov
 
-# the RMSE is different for all three subclasses crops, wetland and forest
+# RMSE Result Crop Forest Wetland
+# 10.511162  5.969928 10.922856
+
+# the RMSE is different for all three subclasses crops, wetlands and forests. 
+# the only one to present a lower RMSE  then for the full VCF was the second class forest. 
+# this possibly suggests the other classes increase the relative error overall
